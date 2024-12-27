@@ -1,0 +1,61 @@
+name: PrisonPlugin
+api-version: 1.19
+version: 1.0.0
+main: org.example.MainClass
+author: ZyploriX
+softdepend:
+  - PlaceholderAPI
+commands:
+  stats:
+    description: попа
+  sell:
+    description: попа
+  upgrade:
+    description: попа
+  level:
+    description: попа
+  spawn:
+    description: попа
+  fraction:
+    description: попа
+  trash:
+    description: попа
+  pay:
+    description: попа
+  ah:
+    description: попа
+  shop:
+    description: попа
+  mines:
+    description: попа
+  donate:
+    description: попа
+  addcurrency:
+    description: попа
+  removecurrency:
+    description: попа
+  autosell:
+    description: попа
+  bosses:
+    description: попа
+  disableboosters:
+    description: попа
+  ls:
+    description: попа
+  developer:
+    description: попа
+  administrator:
+    description: попа
+  builder:
+    description: попа
+  curbuilder:
+    description: попа
+  moderator:
+    description: попа
+permissions:
+  autosell.use:
+    description: Allows the player to use auto sell
+    default: op
+  booster.disable:
+    description: Разрешение на отключение всех бустеров.
+    default: op

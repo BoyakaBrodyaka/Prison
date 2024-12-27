@@ -1,0 +1,528 @@
+Index: src/main/java/org/example/MainClass.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/example/MainClass.java b/src/main/java/org/example/MainClass.java
+--- a/src/main/java/org/example/MainClass.java	
++++ b/src/main/java/org/example/MainClass.java	(date 1732474276183)
+@@ -12,13 +12,6 @@
+ import org.bukkit.event.player.PlayerQuitEvent;
+ import org.bukkit.plugin.java.JavaPlugin;
+ import org.bukkit.scheduler.BukkitRunnable;
+-import org.example.donate.DonateCommand;
+-import org.example.donate.boosters.DonateEvent;
+-import org.example.donate.DonateMenuManager;
+-import org.example.donate.boosters.BoosterManager;
+-import org.example.donate.donateCurrency.AddCurrencyCommand;
+-import org.example.donate.donateCurrency.CurrencyManager;
+-import org.example.donate.donateCurrency.RemoveCurrencyCommand;
+ import org.example.menu.auction.AuctionCommand;
+ import org.example.menu.auction.AuctionManager;
+ import org.example.events.EventManager;
+@@ -69,15 +62,13 @@
+     private ShopMenuManager shopMenuManager;
+     private ToolsMenuManager toolsMenuManager;
+     private MinesMenuManager minesMenuManager;
+-    private DonateMenuManager donateMenuManager;
+-    private CurrencyManager currencyManager;
+-    private BoosterManager boosterManager;
+ 
+    @Override
+     public void onEnable() {
+ 
+            saveDefaultConfig();
+        getServer().getPluginManager().registerEvents(this, this);
++       playerStats = new PlayerStats(getDataFolder(), this);
+       instance = this;
+        manager = new StatusManager(this);
+       scoreboardManager = new ScoreboardManager(this, playerStats);
+@@ -91,10 +82,6 @@
+       pvpModeManager = new PvPModeManager(this, pvpManager);
+       eventManager = new EventManager(this);
+        fractionManager = new FractionManager(this, playerStats);
+-       currencyManager = new CurrencyManager();
+-       boosterManager = new BoosterManager(this);
+-       donateMenuManager = new DonateMenuManager(this, boosterManager, currencyManager);
+-       playerStats = new PlayerStats(getDataFolder(), this);
+ 
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new CustomPlaceholders(this, playerStats).register();
+@@ -208,7 +195,6 @@
+       getServer().getPluginManager().registerEvents(new PlayerJoinQuitListener(this, inventoryManager, playerStats, manager, fractionManager), this);
+       getServer().getPluginManager().registerEvents(new PlayerKillDeathEvent(playerStats, this, inventoryManager), this);
+       getServer().getPluginManager().registerEvents(new FractionCommand(playerStats, fractionManager), this);
+-      getServer().getPluginManager().registerEvents(new DonateEvent(this, boosterManager), this);
+       giveMenuManager.startDisplayingMessages(this);
+       
+       fractionManager.loadFractions();
+@@ -227,9 +213,6 @@
+       getServer().getPluginCommand("ah").setExecutor(new AuctionCommand(auctionManager, playerStats));
+       getServer().getPluginCommand("shop").setExecutor(new ShopCommand(this, shopMenuManager));
+       getServer().getPluginCommand("mines").setExecutor(new MinesCommand(this, minesMenuManager));
+-      getServer().getPluginCommand("donate").setExecutor(new DonateCommand(donateMenuManager));
+-      getServer().getPluginCommand("addcurrency").setExecutor(new AddCurrencyCommand(currencyManager));
+-      getServer().getPluginCommand("removecurrency").setExecutor(new RemoveCurrencyCommand(currencyManager));
+ 
+       eventManager.startEvents();
+    }
+@@ -250,9 +233,8 @@
+         for(Player player : Bukkit.getOnlinePlayers()) {
+             inventoryManager.saveInventory(player);
+         }
+-        if(fractionManager != null) {
+             fractionManager.saveFractionsToFile();
+-        }
++
+         saveConfig();
+     }
+ 
+Index: src/main/java/org/example/donate/boosters/DonateEvent.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/boosters/DonateEvent.java b/src/main/java/org/example/donate/boosters/DonateEvent.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/boosters/DonateEvent.java	
++++ /dev/null	
+@@ -1,48 +0,0 @@
+-package org.example.donate.boosters;
+-
+-import org.bukkit.ChatColor;
+-import org.bukkit.entity.Player;
+-import org.bukkit.event.EventHandler;
+-import org.bukkit.event.Listener;
+-import org.bukkit.event.block.BlockBreakEvent;
+-import org.bukkit.event.entity.PlayerDeathEvent;
+-import org.bukkit.event.inventory.InventoryClickEvent;
+-import org.example.MainClass;
+-
+-public class DonateEvent implements Listener {
+-    private final MainClass plugin;
+-    private final BoosterManager boosterManager;
+-
+-    public DonateEvent(MainClass plugin, BoosterManager boosterManager) {
+-        this.plugin = plugin;
+-        this.boosterManager = boosterManager;
+-    }
+-
+-    @EventHandler
+-    public void onBlockBreak(BlockBreakEvent event) {
+-        Player player = event.getPlayer();
+-        double multiplier = boosterManager.getBoosterMultiplier(player, "блоков");
+-        int blocksGained = (int) (1 * multiplier);
+-        plugin.getPlayerStats().addBlocks(player.getUniqueId(), blocksGained);
+-    }
+-
+-    @EventHandler
+-    public void onPlayerDeath(PlayerDeathEvent event) {
+-        Player player = event.getEntity().getKiller();
+-        if (player != null) {
+-            double multiplier = boosterManager.getBoosterMultiplier(player, "киллов");
+-            int killsGained = (int) (1 * multiplier);
+-            plugin.getPlayerStats().addKills(player.getUniqueId(), killsGained);
+-        }
+-    }
+-
+-    @EventHandler
+-    public void onInventoryClick(InventoryClickEvent event) {
+-        Player player = (Player) event.getWhoClicked();
+-        if (event.getView().getTitle().equals(ChatColor.GREEN + "Магазин")) {
+-            double multiplier = boosterManager.getBoosterMultiplier(player, "денег");
+-            int moneyGained = (int) (100 * multiplier); // Замените на реальное значение
+-            plugin.getPlayerStats().addMoney(player.getUniqueId(), moneyGained);
+-        }
+-    }
+-}
+Index: src/main/java/org/example/donate/boosters/BoosterManager.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/boosters/BoosterManager.java b/src/main/java/org/example/donate/boosters/BoosterManager.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/boosters/BoosterManager.java	
++++ /dev/null	
+@@ -1,105 +0,0 @@
+-package org.example.donate.boosters;
+-
+-import com.google.common.reflect.TypeToken;
+-import com.google.gson.Gson;
+-import com.sun.tools.javac.Main;
+-import org.bukkit.Bukkit;
+-import org.bukkit.ChatColor;
+-import org.bukkit.boss.BarColor;
+-import org.bukkit.boss.BarStyle;
+-import org.bukkit.boss.BossBar;
+-import org.bukkit.configuration.ConfigurationSection;
+-import org.bukkit.configuration.file.FileConfiguration;
+-import org.bukkit.configuration.file.YamlConfiguration;
+-import org.bukkit.entity.Player;
+-import org.bukkit.scheduler.BukkitRunnable;
+-import org.example.MainClass;
+-
+-import java.io.File;
+-import java.io.FileReader;
+-import java.io.FileWriter;
+-import java.io.IOException;
+-import java.lang.reflect.Type;
+-import java.util.HashMap;
+-import java.util.Map;
+-import java.util.UUID;
+-
+-public class BoosterManager {
+-    private final MainClass plugin;
+-    private final Map<UUID, Map<String, Long>> localBoosters = new HashMap<>();
+-    private long globalBoosterEndTime = 0;
+-    private String globalBoosterType = "";
+-
+-    public BoosterManager(MainClass plugin) {
+-        this.plugin = plugin;
+-    }
+-
+-    public void activateLocalBooster(Player player, String type) {
+-        long endTime = System.currentTimeMillis() + 30 * 60 * 1000;
+-        localBoosters.putIfAbsent(player.getUniqueId(), new HashMap<>());
+-        localBoosters.get(player.getUniqueId()).put(type, endTime);
+-        player.sendMessage(ChatColor.GREEN + "Локальный бустер " + type + " активирован!");
+-
+-        new BukkitRunnable() {
+-            @Override
+-            public void run() {
+-                if (System.currentTimeMillis() >= endTime) {
+-                    localBoosters.get(player.getUniqueId()).remove(type);
+-                    player.sendMessage(ChatColor.RED + "Локальный бустер " + type + " истек.");
+-                    cancel();
+-                } else {
+-                    sendActionBar(player, "Локальный бустер " + type + ": " + (endTime - System.currentTimeMillis()) / 1000 + " сек");
+-                }
+-            }
+-        }.runTaskTimer(plugin, 0, 20);
+-    }
+-
+-    public void activateGlobalBooster(String type) {
+-        globalBoosterEndTime = System.currentTimeMillis() + 30 * 60 * 1000;
+-        globalBoosterType = type;
+-        Bukkit.broadcastMessage(ChatColor.GREEN + "Глобальный бустер " + type + " активирован!");
+-
+-        new BukkitRunnable() {
+-            @Override
+-            public void run() {
+-                if (System.currentTimeMillis() >= globalBoosterEndTime) {
+-                    globalBoosterEndTime = 0;
+-                    globalBoosterType = "";
+-                    Bukkit.broadcastMessage(ChatColor.RED + "Глобальный бустер " + type + " истек.");
+-                    cancel();
+-                } else {
+-                    for (Player player : Bukkit.getOnlinePlayers()) {
+-                        sendActionBar(player, "Глобальный бустер " + type + ": " + (globalBoosterEndTime - System.currentTimeMillis()) / 1000 + " сек");
+-                    }
+-                }
+-            }
+-        }.runTaskTimer(plugin, 0, 20);
+-    }
+-
+-    private void sendActionBar(Player player, String message) {
+-        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(message));
+-    }
+-
+-    public boolean isLocalBoosterActive(Player player, String type) {
+-        return localBoosters.containsKey(player.getUniqueId()) &&
+-                localBoosters.get(player.getUniqueId()).containsKey(type) &&
+-                localBoosters.get(player.getUniqueId()).get(type) > System.currentTimeMillis();
+-    }
+-
+-    public boolean isGlobalBoosterActive(String type) {
+-        return globalBoosterEndTime > System.currentTimeMillis() && globalBoosterType.equals(type);
+-    }
+-
+-    public double getBoosterMultiplier(Player player, String type) {
+-        boolean localActive = isLocalBoosterActive(player, type);
+-        boolean globalActive = isGlobalBoosterActive(type);
+-
+-        if (localActive && globalActive) {
+-            return 4.0;
+-        } else if (localActive || globalActive) {
+-            return 2.0;
+-        } else {
+-            return 1.0;
+-        }
+-    }
+-}
+Index: src/main/java/org/example/donate/donateCurrency/CurrencyManager.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/donateCurrency/CurrencyManager.java b/src/main/java/org/example/donate/donateCurrency/CurrencyManager.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/donateCurrency/CurrencyManager.java	
++++ /dev/null	
+@@ -1,20 +0,0 @@
+-package org.example.donate.donateCurrency;
+-
+-import java.util.HashMap;
+-import java.util.UUID;
+-
+-public class CurrencyManager {
+-    private final HashMap<UUID, Integer> playerCurrency = new HashMap<>();
+-
+-    public int getCurrency(UUID player) {
+-        return playerCurrency.getOrDefault(player, 0);
+-    }
+-
+-    public void addCurrency(UUID player, int amount) {
+-        playerCurrency.put(player, getCurrency(player) + amount);
+-    }
+-
+-    public void removeCurrency(UUID player, int amount) {
+-        playerCurrency.put(player, Math.max(0, getCurrency(player) - amount));
+-    }
+-}
+Index: src/main/java/org/example/donate/donateCurrency/AddCurrencyCommand.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/donateCurrency/AddCurrencyCommand.java b/src/main/java/org/example/donate/donateCurrency/AddCurrencyCommand.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/donateCurrency/AddCurrencyCommand.java	
++++ /dev/null	
+@@ -1,34 +0,0 @@
+-package org.example.donate.donateCurrency;
+-
+-import org.bukkit.command.Command;
+-import org.bukkit.command.CommandExecutor;
+-import org.bukkit.command.CommandSender;
+-import org.bukkit.entity.Player;
+-
+-public class AddCurrencyCommand implements CommandExecutor {
+-    private final CurrencyManager currencyManager;
+-
+-    public AddCurrencyCommand(CurrencyManager currencyManager) {
+-        this.currencyManager = currencyManager;
+-    }
+-
+-    @Override
+-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+-        if (args.length < 2) return false;
+-        Player target = sender.getServer().getPlayer(args[0]);
+-        int amount;
+-        try {
+-            amount = Integer.parseInt(args[1]);
+-        } catch (NumberFormatException e) {
+-            return false;
+-        }
+-
+-        if (target != null) {
+-            currencyManager.addCurrency(target.getUniqueId(), amount);
+-            sender.sendMessage("Вы добавили " + amount + " валюты для " + target.getName());
+-            target.sendMessage("Вы получили " + amount + " валюты.");
+-            return true;
+-        }
+-        return false;
+-    }
+-}
+Index: src/main/java/org/example/donate/donateCurrency/RemoveCurrencyCommand.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/donateCurrency/RemoveCurrencyCommand.java b/src/main/java/org/example/donate/donateCurrency/RemoveCurrencyCommand.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/donateCurrency/RemoveCurrencyCommand.java	
++++ /dev/null	
+@@ -1,34 +0,0 @@
+-package org.example.donate.donateCurrency;
+-
+-import org.bukkit.command.Command;
+-import org.bukkit.command.CommandExecutor;
+-import org.bukkit.command.CommandSender;
+-import org.bukkit.entity.Player;
+-
+-public class RemoveCurrencyCommand implements CommandExecutor {
+-    private final CurrencyManager currencyManager;
+-
+-    public RemoveCurrencyCommand(CurrencyManager currencyManager) {
+-        this.currencyManager = currencyManager;
+-    }
+-
+-    @Override
+-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+-        if (args.length < 2) return false;
+-        Player target = sender.getServer().getPlayer(args[0]);
+-        int amount;
+-        try {
+-            amount = Integer.parseInt(args[1]);
+-        } catch (NumberFormatException e) {
+-            return false;
+-        }
+-
+-        if (target != null) {
+-            currencyManager.removeCurrency(target.getUniqueId(), amount);
+-            sender.sendMessage("Вы убрали " + amount + " валюты у " + target.getName());
+-            target.sendMessage("У вас забрали " + amount + " валюты.");
+-            return true;
+-        }
+-        return false;
+-    }
+-}
+Index: src/main/java/org/example/donate/DonateCommand.java
+===================================================================
+diff --git a/src/main/java/org/example/donate/DonateCommand.java b/src/main/java/org/example/donate/DonateCommand.java
+deleted file mode 100644
+--- a/src/main/java/org/example/donate/DonateCommand.java	
++++ /dev/null	
+@@ -1,24 +0,0 @@
+-package org.example.donate;
+-
+-import org.bukkit.command.Command;
+-import org.bukkit.command.CommandExecutor;
+-import org.bukkit.command.CommandSender;
+-import org.bukkit.entity.Player;
+-
+-public class DonateCommand implements CommandExecutor {
+-    private final DonateMenuManager donateMenuManager;
+-
+-    public DonateCommand(DonateMenuManager donateMenuManager) {
+-        this.donateMenuManager = donateMenuManager;
+-    }
+-
+-    @Override
+-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+-        if (sender instanceof Player) {
+-            Player player = (Player) sender;
+-            donateMenuManager.openDonateMenu(player);
+-            return true;
+-        }
+-        return false;
+-    }
+-}
+Index: src/main/java/org/example/donate/DonateMenuManager.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/org/example/donate/DonateMenuManager.java b/src/main/java/org/example/donate/DonateMenuManager.java
+--- a/src/main/java/org/example/donate/DonateMenuManager.java	
++++ b/src/main/java/org/example/donate/DonateMenuManager.java	(date 1732474557804)
+@@ -1,22 +1,8 @@
+ package org.example.donate;
+ 
+-import org.bukkit.Bukkit;
+-import org.bukkit.ChatColor;
+-import org.bukkit.Material;
+-import org.bukkit.entity.Player;
+-import org.bukkit.event.EventHandler;
+-import org.bukkit.event.Listener;
+-import org.bukkit.event.inventory.InventoryClickEvent;
+-import org.bukkit.inventory.Inventory;
+-import org.bukkit.inventory.ItemStack;
+-import org.bukkit.inventory.meta.ItemMeta;
+ import org.example.MainClass;
+-import org.example.donate.boosters.BoosterManager;
+-import org.example.donate.donateCurrency.CurrencyManager;
+ 
+-import java.util.List;
+-
+-public class DonateMenuManager implements Listener {
++public class DonateMenuManager {
+     private final MainClass plugin;
+     private final BoosterManager boosterManager;
+     private final CurrencyManager currencyManager;
+@@ -25,102 +11,25 @@
+         this.plugin = plugin;
+         this.boosterManager = boosterManager;
+         this.currencyManager = currencyManager;
+-        Bukkit.getPluginManager().registerEvents(this, plugin);
+     }
+ 
+     public void openDonateMenu(Player player) {
+-        Inventory donateMenu = Bukkit.createInventory(null, 27, ChatColor.GOLD + "Донат Меню");
+-
+-        donateMenu.setItem(10, createMenuItem(Material.DIAMOND, ChatColor.GREEN + "Локальный бустер киллов", "Локальный бустер на 1 час"));
+-        donateMenu.setItem(11, createMenuItem(Material.EMERALD, ChatColor.GREEN + "Локальный бустер денег", "Локальный бустер на 1 час"));
+-        donateMenu.setItem(12, createMenuItem(Material.REDSTONE, ChatColor.GREEN + "Локальный бустер блоков", "Локальный бустер на 1 час"));
++        Inventory donateMenu = Bukkit.createInventory(null, 27, "Donate Menu");
+ 
+-        donateMenu.setItem(14, createMenuItem(Material.DIAMOND_BLOCK, ChatColor.GREEN + "Глобальный бустер киллов", "Глобальный бустер на 1 час"));
+-        donateMenu.setItem(15, createMenuItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "Глобальный бустер денег", "Глобальный бустер на 1 час"));
+-        donateMenu.setItem(16, createMenuItem(Material.REDSTONE_BLOCK, ChatColor.GREEN + "Глобальный бустер блоков", "Глобальный бустер на 1 час"));
+-
+-        donateMenu.setItem(20, createMenuItem(Material.PAPER, ChatColor.AQUA + "Отключение комиссии при /pay", "Отключение комиссии на 24 часа"));
+-        donateMenu.setItem(21, createMenuItem(Material.CHEST, ChatColor.AQUA + "Автопродажа блоков", "Автопродажа блоков на 24 часа"));
+-
+-        // Добавляем отображение текущей валюты
+-        donateMenu.setItem(22, createCurrencyItem(player));
++        donateMenu.setItem(0, createMenuItem(Material.DIAMOND, "Локальный бустер", "Активировать локальный бустер", "Стоимость: 1000 монет"));
++        donateMenu.setItem(1, createMenuItem(Material.EMERALD, "Глобальный бустер", "Активировать глобальный бустер", "Стоимость: 5000 монет"));
++        donateMenu.setItem(2, createMenuItem(Material.GOLD_INGOT, "Отключение комиссии", "Отключить комиссию на 1 час", "Стоимость: 2000 монет"));
+ 
+         player.openInventory(donateMenu);
+     }
+ 
+-    private ItemStack createMenuItem(Material material, String name, String description) {
++    // Метод для создания предмета меню
++    private ItemStack createMenuItem(Material material, String name, String... lore) {
+         ItemStack item = new ItemStack(material);
+         ItemMeta meta = item.getItemMeta();
+         meta.setDisplayName(name);
+-        meta.setLore(List.of(ChatColor.WHITE + description));
++        meta.setLore(Arrays.asList(lore));
+         item.setItemMeta(meta);
+         return item;
+-    }
+-
+-    private ItemStack createCurrencyItem(Player player) {
+-        ItemStack item = new ItemStack(Material.GOLD_NUGGET);
+-        ItemMeta meta = item.getItemMeta();
+-        meta.setDisplayName(ChatColor.YELLOW + "Текущая валюта: " + currencyManager.getCurrency(player.getUniqueId()));
+-        item.setItemMeta(meta);
+-        return item;
+-    }
+-
+-    @EventHandler
+-    public void onInventoryClick(InventoryClickEvent event) {
+-        if (event.getView().getTitle().equals(ChatColor.GOLD + "Донат Меню")) {
+-            event.setCancelled(true);
+-            Player player = (Player) event.getWhoClicked();
+-            ItemStack clickedItem = event.getCurrentItem();
+-            if (clickedItem != null && clickedItem.hasItemMeta()) {
+-                String itemName = clickedItem.getItemMeta().getDisplayName();
+-                switch (itemName) {
+-                    case "§aЛокальный бустер киллов":
+-                        activateBooster(player, "киллов", true);
+-                        break;
+-                    case "§aЛокальный бустер денег":
+-                        activateBooster(player, "денег", true);
+-                        break;
+-                    case "§aЛокальный бустер блоков":
+-                        activateBooster(player, "блоков", true);
+-                        break;
+-                    case "§aГлобальный бустер киллов":
+-                        activateBooster(player, "киллов", false);
+-                        break;
+-                    case "§aГлобальный бустер денег":
+-                        activateBooster(player, "денег", false);
+-                        break;
+-                    case "§aГлобальный бустер блоков":
+-                        activateBooster(player, "блоков", false);
+-                        break;
+-                    case "§bОтключение комиссии при /pay":
+-                        disablePayCommission(player);
+-                        break;
+-                    case "§bАвтопродажа блоков":
+-                        enableAutoSell(player);
+-                        break;
+-                    default:
+-                        player.sendMessage(ChatColor.RED + "Неизвестный предмет: " + itemName);
+-                        break;
+-                }
+-            }
+-        }
+-    }
+-
+-    private void activateBooster(Player player, String type, boolean isLocal) {
+-        if (isLocal) {
+-            boosterManager.activateLocalBooster(player, type);
+-        } else {
+-            boosterManager.activateGlobalBooster(type);
+-        }
+-    }
+ 
+-    private void disablePayCommission(Player player) {
+-        // Реализация отключения комиссии при /pay
+-        player.sendMessage(ChatColor.AQUA + "Комиссия при использовании команды /pay отключена на 24 часа!");
+     }
+-
+-    private void enableAutoSell(Player player) {
+-        // Реализация автопродажи блоков
+-        player.sendMessage(ChatColor.AQUA + "Автопродажа блоков активирована на 24 часа!");
+-    }
+-}

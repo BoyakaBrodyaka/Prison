@@ -1,0 +1,25 @@
+# config.yml
+lsPlayers:
+  - Player1
+  - Player2
+  - Player3
+devPlayers:
+  - Dev1
+  - Dev2
+  - Dev3
+admPlayers:
+  - Adm1
+  - Adm2
+  - Adm3
+builderPlayers:
+  - Builder1
+  - Builder2
+  - Builder3
+curbuilderPlayers:
+  - CurBuilder1
+  - CurBuilder2
+  - CurBuilder3
+moderatorPlayers:
+  - Mod1
+  - Mod2
+  - Mod3
