@@ -2,7 +2,7 @@ name: PrisonPlugin
 api-version: 1.19
 version: 1.0.0
 main: org.example.MainClass
-author: ZyploriX
+author: BoyakaBrodyaka
 softdepend:
   - PlaceholderAPI
 commands:
